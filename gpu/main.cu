@@ -14,7 +14,7 @@
 using namespace std::chrono;
 
 template<std::size_t n>
-__global__ void dijkstra(int (&graph)[n][n], int source, int target, int thread, bool* solved);
+__device__ void dijkstra(int *graph, int source, int target, int thread, bool* solved);
 
 template<std::size_t n>
 void Astar(int (&graph)[n][n], int source, int target, int thread, bool* solved);
@@ -26,7 +26,6 @@ template<std::size_t n>
 void addCloseBias(int (&graph)[n][n]);
 
 #define NUM_GRAPHS 1000
-//bool solved[NUM_GRAPHS];
 
 void stop(std::thread ts[NUM_GRAPHS])
 {
@@ -39,21 +38,20 @@ void stop(std::thread ts[NUM_GRAPHS])
 int bg[NUM_GRAPHS][500][500];
 int ss[NUM_GRAPHS];
 int ts[NUM_GRAPHS];
-void a(int t1, int t2, bool* solved)
-{
-  for(int i = t1; i < t2; ++i)
-  {
-    Astar(bg[i], ss[i], ts[i], i, solved);
-  }
+__host__ __device__ inline int index(const int x, const int y, const int z) {
+     return x * NUM_GRAPHS * NUM_GRAPHS + y * 500 + z;
+}
 
-}
-void d(int t1, int t2, bool* solved)
+__global__ void pathfind(int *g, int ts[NUM_GRAPHS], int ss[NUM_GRAPHS], bool *solved)
 {
-  for(int i = t1; i < t2; ++i)
-  {
-    //dijkstra<500><<<5,5>>>(bg[i], ss[i], ts[i], i, solved);
-  }
+  int idx = blockIdx.x*blockDim.x + threadIdx.x;
+  idx++;
+  printf("test\n");
+  printf("%d", ss[0]);
+  //pass in which graph is being worked on
+  dijkstra<500>(g, ss[0], ts[0], 0, solved);
 }
+
 int main() 
 {
   srand(time(NULL));
@@ -69,92 +67,111 @@ int main()
   bool* solved_gpu;
   cudaMalloc(&solved_gpu, NUM_GRAPHS*sizeof(bool));
   cudaMemcpy(solved_gpu, solved, NUM_GRAPHS*sizeof(bool), cudaMemcpyHostToDevice);
-  //d(0, 1000, solved_gpu);
-  std::vector<int> dist(500, INF);
-  dijkstra<500><<<5,5>>>(bg[0], ss[0], ts[0], 0, solved);
+  
+  int *flatG = (int*) malloc(NUM_GRAPHS*500*500*sizeof(int));
+  for(int x = 0; x < NUM_GRAPHS; ++x)
+    for(int y = 0; y < 500; ++y)
+      for(int z = 0; z < 500; ++z)
+        flatG[x*500*500 + y*500 + z] = bg[x][y][z];
+  
+  int *g;
+  cudaMalloc(&g, NUM_GRAPHS*500*500*sizeof(int));
+  cudaMemcpy(g, flatG, NUM_GRAPHS*500*500*sizeof(int), cudaMemcpyHostToDevice);
+  
+  std::cout << "source: " << ss[0] << std::endl;
+  std::cout << "target: " << ts[0] << std::endl;
+  
+  int *ss_gpu;
+  cudaMalloc(&ss_gpu, NUM_GRAPHS*sizeof(int));
+  cudaMemcpy(ss_gpu, ss, NUM_GRAPHS*sizeof(int), cudaMemcpyHostToDevice);
+  
+  int *ts_gpu;
+  cudaMalloc(&ts_gpu, NUM_GRAPHS*sizeof(int));
+  cudaMemcpy(ts_gpu, ts, NUM_GRAPHS*sizeof(int), cudaMemcpyHostToDevice);
+  pathfind<<<1,1>>>(g, ss_gpu, ts_gpu, solved_gpu);
+
   //sync to see print statements
   cudaDeviceSynchronize();
-  //std::thread th1(d, 0, NUM_GRAPHS);
-  //std::thread th2(a, 0, NUM_GRAPHS);
-  //th1.join();
-  //th2.join();
-  /*std::thread a_ths[NUM_GRAPHS];
-  std::thread d_ths[NUM_GRAPHS];
-  for(int i = 0; i < NUM_GRAPHS; ++i)
-  {
-    a_ths[i] = std::thread(Astar<500>, std::ref(bg[i]), ss[i], ts[i], i);
-    d_ths[i] = std::thread(dijkstra<500>, std::ref(bg[i]), ss[i], ts[i], i);
-  }*/
-  /*for(int i = 0; i < NUM_GRAPHS; i+=10)
-  {
-    a_ths[i/10] = std::thread(a, i, i+10);
-    d_ths[i/10] = std::thread(d, i, i+10);
-  }*/
-  /*std::thread s1(stop, a_ths);
-  std::thread s2(stop, d_ths);
-  s1.join();
-  s2.join();*/
   return 0;
 }
 
-__device__ bool inSet()
+__device__ bool setEmpty(bool* set, int size)
 {
+  for(int i = 0; i < size; ++i)
+    if(set[i])
+      return false;
   return true;
 }
-template<std::size_t n>
-__global__ void dijkstra(int (&graph)[n][n], int source, int target, int thread, bool* solved)
+
+__device__ int firstSet(bool*set, int size)
 {
-  //std::vector<int> dist(n, INF);
+  for(int i = 0; i < size; ++i)
+    if(set[i])
+      return i;
+  return -1;
+}
+
+template<std::size_t n>
+__device__ void dijkstra(int *graph, int source, int target, int thread, bool* solved)
+{
   int *dist = new int[n];
   for(int i = 0; i < n; ++i)
     dist[i] = INF;
-  inSet();
-  dist[source] = 0;// dist.at(source) = 0;
+  dist[source] = 0;
   bool *vertices = new bool[n];
-  //std::set<int> vertices;
   for(int i = 0; i < n; i++)
   {
     vertices[i] = true;
-    //vertices.insert(i);
   }
-  printf("Test\n");
-  /*while(!vertices.empty())
+  while(!setEmpty(vertices, n))
   {
     if(solved[thread])
     {
+      //printf("solved:%d\n", solved[thread]);
+      //printf("dist:%d", dist[target]);
       return;
     }
-    std::set<int>::iterator it;
-    int minV = *vertices.begin();
-    int min = dist[minV];//dist.at(minV);
-    for(it = vertices.begin(); it != vertices.end(); ++it)
+    int minV = firstSet(vertices, n);
+    if(minV == -1)
+      break;
+    int min = dist[minV];
+    for(int i = 0; i < n; ++i)
     {
-      if(dist[*it] < min)//dist.at(*it) < min)
+      if(vertices[i] && dist[i] < min)
       {
-        minV = *it;
-        min = dist[*it];//dist.at(*it);
+        minV = i;
+        min = dist[i];
       }
     }
+    printf("minV:%d\n",minV);
     if(minV == target)
       break;
-    vertices.erase(minV);
-    for(it = vertices.begin(); it != vertices.end(); ++it)
+    //vertices.erase(minV);
+    vertices[minV] = false;
+    //printf("weight:%d\n", graph[index(0,50,0)]);
+    //printf("n:%d\n", n);
+    //int numV = n;
+    for(int i = 0; i < n; ++i)
     {
+      //printf("i:%d numV:%d\n", i, numV);
       //skip if not adjacent
-      if(graph[minV][*it] == INF)
+      if(graph[index(0,minV,i)] == INF)
         continue;
-      int newDist = dist[minV] + graph[minV][*it];//dist.at(minV) + graph[minV][*it];
-      if(newDist < dist[*it])//dist.at(*it))
+      int newDist = dist[minV] + graph[index(0,minV,i)];//graph[minV][i];//dist.at(minV) + graph[minV][*it];
+      if(newDist < dist[i])//dist.at(*it))
       {
-        dist[*it] = newDist;// dist.at(*it) = newDist;
+        dist[i] = newDist;// dist.at(*it) = newDist;
       }
+      //printf("end for loop\n");
     }
-  }*/
-  solved[thread] = true;
-  for(int i = 0; i < n; i++)
-  {
-    //std::cout << i <<": " << dist.at(i) << " | "; 
+    //printf("end while loop, set empty:%d", setEmpty(vertices, n));
   }
+  solved[thread] = true;
+  //for(int i = 0; i < n; i++)
+  //{
+    printf("%d: | \n", dist[target]);
+    //std::cout << i <<": " << dist.at(i) << " | "; 
+  //}
 }
 
 template<std::size_t n>
