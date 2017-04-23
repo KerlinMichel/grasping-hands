@@ -17,7 +17,7 @@ template<std::size_t n>
 __device__ void dijkstra(int *graph, int source, int target, int thread, bool* solved);
 
 template<std::size_t n>
-void Astar(int (&graph)[n][n], int source, int target, int thread, bool* solved);
+__device__ void Astar(int *graph, int source, int target, int thread, bool* solved);
 
 template<std::size_t n>
 void randomGraph(int (&graph)[n][n]);
@@ -127,8 +127,6 @@ __device__ void dijkstra(int *graph, int source, int target, int thread, bool* s
   {
     if(solved[thread])
     {
-      //printf("solved:%d\n", solved[thread]);
-      //printf("dist:%d", dist[target]);
       return;
     }
     int minV = firstSet(vertices, n);
@@ -143,14 +141,9 @@ __device__ void dijkstra(int *graph, int source, int target, int thread, bool* s
         min = dist[i];
       }
     }
-    printf("minV:%d\n",minV);
     if(minV == target)
       break;
-    //vertices.erase(minV);
     vertices[minV] = false;
-    //printf("weight:%d\n", graph[index(0,50,0)]);
-    //printf("n:%d\n", n);
-    //int numV = n;
     for(int i = 0; i < n; ++i)
     {
       //printf("i:%d numV:%d\n", i, numV);
@@ -173,52 +166,54 @@ __device__ void dijkstra(int *graph, int source, int target, int thread, bool* s
     //std::cout << i <<": " << dist.at(i) << " | "; 
   //}
 }
-
+#include <cmath>
 template<std::size_t n>
-void Astar(int (&graph)[n][n], int source, int target, int thread, bool* solved)
+__device__ void Astar(int *graph, int source, int target, int thread, bool* solved)
 {
-  std::vector<int> dist(n, INF);
-  dist.at(source) = 0;
-  std::set<int> vertices;
+  int *dist = new int[n];
+  for(int i = 0; i < n; ++i)
+    dist[i] = INF;
+  dist[source] = 0;
+  bool *vertices = new bool[n];
   for(int i = 0; i < n; i++)
   {
-    vertices.insert(i);
+    vertices[i] = true;
   }
-  while(!vertices.empty())
+  while(!setEmpty(vertices, n))
   {
     if(solved[thread])
     {
       return;
     }
-    std::set<int>::iterator it;
-    int minV = *vertices.begin();
-    int min = dist.at(minV);
-    for(it = vertices.begin(); it != vertices.end(); ++it)
+    int minV = firstSet(vertices, n);
+    if(minV == -1)
+      break;
+    int min = dist[minV];
+    for(int i = 0; i < n; ++i)
     {
-      if((dist.at(*it) + 2*(*it)) < min)
+      if(vertices[i] && dist[i]+2*(std::abs(i-target)) < min)
       {
-        minV = *it;
-        min = dist.at(*it);
+        minV = i;
+        min = dist[i];
       }
     }
     if(minV == target)
       break;
-    vertices.erase(minV);
-    for(it = vertices.begin(); it != vertices.end(); ++it)
+    vertices[minV] = false;
+    for(int i = 0; i < n; ++i)
     {
+      //printf("i:%d numV:%d\n", i, numV);
       //skip if not adjacent
-      if(graph[minV][*it] == INF)
+      if(graph[index(0,minV,i)] == INF)
         continue;
-      int newDist = dist.at(minV) + graph[minV][*it];
-      if(newDist < dist.at(*it))
+      int newDist = dist[minV] + graph[index(0,minV,i)];//graph[minV][i];//dist.at(minV) + graph[minV][*it];
+      if(newDist < dist[i])//dist.at(*it))
       {
-        dist.at(*it) = newDist;
+        dist[i] = newDist;// dist.at(*it) = newDist;
       }
+      //printf("end for loop\n");
     }
-  }
-  for(int i = 0; i < n; i++)
-  {
-    //std::cout << "d: " << dist.at(i) << std::endl;
+    //printf("end while loop, set empty:%d", setEmpty(vertices, n));
   }
   solved[thread] = true;
 }

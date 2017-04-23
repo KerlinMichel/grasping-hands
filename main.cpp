@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <iomanip>
+#include <cmath>
 #define INF std::numeric_limits<int>::max()
 #define currTime duration_cast<milliseconds>(system_clock::now().time_since_epoch());
 
@@ -159,7 +160,7 @@ void Astar(int (&graph)[n][n], int source, int target, int thread)
     int min = dist.at(minV);
     for(it = vertices.begin(); it != vertices.end(); ++it)
     {
-      if((dist.at(*it) + 2*(*it)) < min)
+      if((dist.at(*it) + 2*(std::abs(*it-target))) < min)
       {
         minV = *it;
         min = dist.at(*it);
