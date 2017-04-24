@@ -183,7 +183,7 @@ __device__ void dijkstra(int *graph, int graphIdx, int source, int target, int t
     for(int i = 0; i < n; ++i)
     {
       //skip if not adjacent
-      if(graph[index(graphIdx,minV,i)] == INF)
+      if(graph[index(graphIdx,minV,i)] == INF || !vertices[i])
         continue;
       int newDist = dist[minV] + graph[index(graphIdx,minV,i)];
       if(newDist < dist[i])
@@ -230,7 +230,7 @@ __device__ void Astar(int *graph, int graphIdx, int source, int target, int thre
     for(int i = 0; i < n; ++i)
     {
       //skip if not adjacent
-      if(graph[index(graphIdx,minV,i)] == INF)
+      if(graph[index(graphIdx,minV,i)] == INF || !vertices[i])
         continue;
       int newDist = dist[minV] + graph[index(graphIdx,minV,i)];
       if(newDist < dist[i])
