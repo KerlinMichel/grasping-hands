@@ -42,9 +42,6 @@ __host__ __device__ inline int index(const int x, const int y, const int z) {
 __global__ void pathfind(int *g, int ts[NUM_GRAPHS], int ss[NUM_GRAPHS], bool *solved)
 {
   int idx = blockIdx.x*blockDim.x + threadIdx.x;
-  //printf("test\n");
-  printf("%d ", idx);
-  //pass in which graph is being worked on
   if(idx < NUM_GRAPHS)
   {
     int i = idx/2;
