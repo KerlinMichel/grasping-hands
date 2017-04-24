@@ -71,7 +71,7 @@ __global__ void a(int *g, int ts[NUM_GRAPHS], int ss[NUM_GRAPHS], bool *solved)
 
 
 #define THREADS_PER_BLOCK 1000
-int main() 
+int main(int argc, char* argv[]) 
 {
   srand(time(NULL));
   bool* solved = (bool*) malloc(NUM_GRAPHS*sizeof(bool));
@@ -97,9 +97,6 @@ int main()
   cudaMalloc(&g, NUM_GRAPHS*500*500*sizeof(int));
   cudaMemcpy(g, flatG, NUM_GRAPHS*500*500*sizeof(int), cudaMemcpyHostToDevice);
   
-  std::cout << "source: " << ss[0] << std::endl;
-  std::cout << "target: " << ts[0] << std::endl;
-  
   int *ss_gpu;
   cudaMalloc(&ss_gpu, NUM_GRAPHS*sizeof(int));
   cudaMemcpy(ss_gpu, ss, NUM_GRAPHS*sizeof(int), cudaMemcpyHostToDevice);
@@ -114,12 +111,20 @@ int main()
   
   int numBlocks = NUM_GRAPHS*2/THREADS_PER_BLOCK;
   //pathfind<<<numBlocks, THREADS_PER_BLOCK>>>(g, ss_gpu, ts_gpu, solved_gpu);
+  bool astarf = argv[1][0] == 'a';
+  bool dijf = argv[1][0] == 'd';
+  bool bothf = argv[1][0] == 'b';
+
   cudaStream_t streams[2];
-  cudaStreamCreate(&streams[0]);
-  cudaStreamCreate(&streams[1]);
+  if(dijf || bothf)
+    cudaStreamCreate(&streams[0]);
+  if(astarf || bothf)
+    cudaStreamCreate(&streams[1]);
   
-  d<<<numBlocks/2, THREADS_PER_BLOCK, 0, streams[0]>>>(g, ss_gpu, ts_gpu, solved_gpu);
-  a<<<numBlocks/2, THREADS_PER_BLOCK, 0, streams[1]>>>(g, ss_gpu, ts_gpu, solved_gpu); 
+  if(dijf || bothf)
+    d<<<numBlocks/2, THREADS_PER_BLOCK, 0, streams[0]>>>(g, ss_gpu, ts_gpu, solved_gpu);
+  if(astarf || bothf)
+    a<<<numBlocks/2, THREADS_PER_BLOCK, 0, streams[1]>>>(g, ss_gpu, ts_gpu, solved_gpu); 
   
   //sync to see print statements
   cudaDeviceSynchronize();

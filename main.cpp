@@ -25,7 +25,7 @@ void randomGraph(int (&graph)[n][n]);
 template<std::size_t n>
 void addCloseBias(int (&graph)[n][n]);
 
-#define NUM_GRAPHS 1000
+#define NUM_GRAPHS 2048
 bool solved[NUM_GRAPHS];
 
 void stop(std::thread ts[NUM_GRAPHS])
